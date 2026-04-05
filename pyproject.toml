@@ -1,7 +1,7 @@
 [project]
-name = "project"
+name = "nlp-churn-rating"
 version = "0.1.0"
-description = "Add your description here"
+description = "Telco churn prediction — MLP (PyTorch) vs. Scikit-Learn baselines, tracked with MLflow"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,4 +12,15 @@ dependencies = [
     "seaborn",
     "scikit-learn",
     "mlflow",
+    "torch",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
