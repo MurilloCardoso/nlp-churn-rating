@@ -14,14 +14,27 @@ dependencies = [
     "mlflow",
     "torch",
     "xgboost>=3.2.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
+    "pytest>=9.0.3",
     "pytest-cov",
+    "pandera>=0.20",
+    "httpx>=0.27",
+    "ruff>=0.4",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]
