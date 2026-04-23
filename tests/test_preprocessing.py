@@ -18,12 +18,11 @@ def test_best_threshold_recall_returns_float():
     thresh = best_threshold_recall(y_true, probs)
     assert isinstance(thresh, float)
 
-
+# Testa se o threshold retornado está entre 0 e 1, o que é esperado para probabilidades.    
 def test_best_threshold_recall_range():
     y_true, probs = _make_perfect_probs()
     thresh = best_threshold_recall(y_true, probs)
     assert 0.0 <= thresh <= 1.0
-
 
 def test_best_threshold_recall_with_noisy_probs():
     rng    = np.random.default_rng(42)

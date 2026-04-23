@@ -41,3 +41,14 @@ uv run pytest
 
 ---
 
+
+
+
+
+Num terminal, sobe a API:
+
+
+uvicorn src.api:app --reload
+
+
+

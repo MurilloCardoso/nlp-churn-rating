@@ -64,10 +64,14 @@ def best_threshold_recall(
 ) -> float:
     """Threshold que maximiza recall para churn, com precisão mínima de min_precision."""
     precision, recall, thresholds = precision_recall_curve(y_true, probs)
-    # precision/recall têm len+1 em relação a thresholds — ignorar último ponto
+    # precision/recall têm len+1 em relação a thresholds — "pegue todos os elementos do array, exceto o último" 
     mask = precision[:-1] >= min_precision
+
+    # Existe pelo menos um True aqui?
     if mask.any():
+        # pegue o índice do maior recall entre os que satisfazem a restrição de precisão
         best_idx = recall[:-1][mask].argmax()
+            # retorna o threshold correspondente a esse índice 
         return float(thresholds[mask][best_idx])
     # fallback: threshold que maximiza recall sem restrição
     return float(thresholds[recall[:-1].argmax()])
@@ -113,8 +117,12 @@ if __name__ == "__main__":
 
     feature_columns: list[str] = list(X.columns)
 
-    X_train, X_test, y_train, y_test = train_test_split(
+    X_temp, X_test, y_temp, y_test = train_test_split(
         X, y, test_size=0.2, random_state=SEED, stratify=y
+    )
+
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_temp, y_temp, test_size=0.2, random_state=SEED, stratify=y_temp
     )
 
     n_neg = int((y_train == 0).sum())
