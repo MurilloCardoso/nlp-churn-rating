@@ -36,6 +36,11 @@ WEIGHT_DECAY  = 1e-4
 EPOCHS        = 300
 PATIENCE      = 20
 BATCH_SIZE    = 128
+POS_WEIGHT    = 1.5
+
+# Custos de negócio (R$) — usados para escolher threshold
+COST_FN = 1500  # cliente que sai sem receber ação de retenção
+COST_FP = 50    # ação de retenção oferecida a quem não ia sair
 
 
 class ChurnMLP(nn.Module):
@@ -64,32 +69,57 @@ def best_threshold_recall(
 ) -> float:
     """Threshold que maximiza recall para churn, com precisão mínima de min_precision."""
     precision, recall, thresholds = precision_recall_curve(y_true, probs)
-    # precision/recall têm len+1 em relação a thresholds — "pegue todos os elementos do array, exceto o último" 
     mask = precision[:-1] >= min_precision
-
-    # Existe pelo menos um True aqui?
     if mask.any():
-        # pegue o índice do maior recall entre os que satisfazem a restrição de precisão
         best_idx = recall[:-1][mask].argmax()
-            # retorna o threshold correspondente a esse índice 
         return float(thresholds[mask][best_idx])
-    # fallback: threshold que maximiza recall sem restrição
     return float(thresholds[recall[:-1].argmax()])
 
 
-def log_metrics(name: str, y_true: np.ndarray, probs: np.ndarray) -> tuple:
-    thresh = best_threshold_recall(y_true, probs)
-    pred   = (probs >= thresh).astype(int)
-    auc    = roc_auc_score(y_true, probs)
-    pr_auc = average_precision_score(y_true, probs)
-    rec    = recall_score(y_true, pred)
-    f1     = f1_score(y_true, pred)
-    acc    = accuracy_score(y_true, pred)
+def best_threshold_cost(
+    y_true: np.ndarray,
+    probs: np.ndarray,
+    cost_fn: float = COST_FN,
+    cost_fp: float = COST_FP,
+) -> float:
+    """Threshold que minimiza o custo esperado (cost_fn * FN + cost_fp * FP)."""
+    _, _, thresholds = precision_recall_curve(y_true, probs)
+    costs = np.array([
+        ((y_true == 1) & (probs < t)).sum() * cost_fn
+        + ((y_true == 0) & (probs >= t)).sum() * cost_fp
+        for t in thresholds
+    ])
+    return float(thresholds[int(costs.argmin())])
+
+
+def expected_cost(
+    y_true: np.ndarray,
+    pred: np.ndarray,
+    cost_fn: float = COST_FN,
+    cost_fp: float = COST_FP,
+) -> tuple[float, int, int]:
+    fn = int(((y_true == 1) & (pred == 0)).sum())
+    fp = int(((y_true == 0) & (pred == 1)).sum())
+    return float(fn * cost_fn + fp * cost_fp), fn, fp
+
+
+def log_metrics(name: str, y_true: np.ndarray, probs: np.ndarray) -> dict:
+    thresh    = best_threshold_cost(y_true, probs)
+    pred      = (probs >= thresh).astype(int)
+    auc       = roc_auc_score(y_true, probs)
+    pr_auc    = average_precision_score(y_true, probs)
+    rec       = recall_score(y_true, pred)
+    f1        = f1_score(y_true, pred)
+    acc       = accuracy_score(y_true, pred)
+    cost, fn, fp = expected_cost(y_true, pred)
     logger.info(
-        "%s | AUC-ROC=%.4f | PR-AUC=%.4f | Recall=%.4f | F1=%.4f | Acc=%.4f | thresh=%.4f",
-        name, auc, pr_auc, rec, f1, acc, thresh,
+        "%s | AUC=%.4f PR-AUC=%.4f Rec=%.4f F1=%.4f Acc=%.4f | thresh=%.4f | FN=%d FP=%d cost=R$%.0f",
+        name, auc, pr_auc, rec, f1, acc, thresh, fn, fp, cost,
     )
-    return auc, pr_auc, rec, f1, acc, thresh
+    return {
+        "auc": auc, "pr_auc": pr_auc, "recall": rec, "f1": f1, "accuracy": acc,
+        "threshold": thresh, "fn": fn, "fp": fp, "expected_cost": cost,
+    }
 
 
 if __name__ == "__main__":
@@ -140,7 +170,7 @@ if __name__ == "__main__":
     y_test_t  = torch.tensor(y_test.values,  dtype=torch.float32).unsqueeze(1)
 
     model      = ChurnMLP(input_dim=X_train_t.shape[1])
-    pos_weight = torch.tensor([n_neg / n_pos], dtype=torch.float32)
+    pos_weight = torch.tensor([POS_WEIGHT], dtype=torch.float32)
     loss_fn    = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer  = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler  = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -150,7 +180,7 @@ if __name__ == "__main__":
     dataset    = torch.utils.data.TensorDataset(X_train_t, y_train_t)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    best_val_recall  = -1.0
+    best_val_cost    = float("inf")
     patience_counter = 0
 
     for epoch in range(EPOCHS):
@@ -170,12 +200,12 @@ if __name__ == "__main__":
 
         scheduler.step(val_loss)
 
-        val_thresh = best_threshold_recall(y_test.values, val_probs)
-        val_pred   = (val_probs >= val_thresh).astype(int)
-        val_recall = recall_score(y_test.values, val_pred)
+        val_thresh   = best_threshold_cost(y_test.values, val_probs)
+        val_pred     = (val_probs >= val_thresh).astype(int)
+        val_cost, _, _ = expected_cost(y_test.values, val_pred)
 
-        if val_recall > best_val_recall:
-            best_val_recall  = val_recall
+        if val_cost < best_val_cost:
+            best_val_cost    = val_cost
             patience_counter = 0
             MODELS_DIR.mkdir(exist_ok=True)
             torch.save(model.state_dict(), MODELS_DIR / "best_model.pt")
@@ -183,14 +213,14 @@ if __name__ == "__main__":
             patience_counter += 1
             if patience_counter >= PATIENCE:
                 logger.info(
-                    "Early stopping epoch=%d | best_val_recall=%.4f", epoch, best_val_recall
+                    "Early stopping epoch=%d | best_val_cost=R$%.0f", epoch, best_val_cost
                 )
                 break
 
         if epoch % 10 == 0:
             logger.info(
-                "Epoch %3d | train_loss=%.4f | val_loss=%.4f | val_recall=%.4f | lr=%.6f",
-                epoch, loss.item(), val_loss.item(), val_recall,
+                "Epoch %3d | train_loss=%.4f | val_loss=%.4f | val_cost=R$%.0f | lr=%.6f",
+                epoch, loss.item(), val_loss.item(), val_cost,
                 optimizer.param_groups[0]["lr"],
             )
 
@@ -200,9 +230,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         mlp_probs = torch.sigmoid(model(X_test_t)).squeeze().numpy()
 
-    mlp_auc, mlp_pr_auc, mlp_rec, mlp_f1, mlp_acc, mlp_thresh = log_metrics(
-        "MLP (PyTorch)", y_test.values, mlp_probs
-    )
+    metrics = log_metrics("MLP (PyTorch)", y_test.values, mlp_probs)
 
     # ── Salvar artefatos para a API ───────────────────────────────────────────
     MODELS_DIR.mkdir(exist_ok=True)
@@ -211,7 +239,7 @@ if __name__ == "__main__":
     with open(MODELS_DIR / "feature_columns.json", "w") as f:
         json.dump(feature_columns, f)
     with open(MODELS_DIR / "threshold.json", "w") as f:
-        json.dump({"threshold": mlp_thresh}, f)
+        json.dump({"threshold": metrics["threshold"]}, f)
     logger.info("Artefatos salvos em %s", MODELS_DIR)
 
     # ── MLflow ────────────────────────────────────────────────────────────────
@@ -230,18 +258,24 @@ if __name__ == "__main__":
             "epochs_max":       EPOCHS,
             "patience":         PATIENCE,
             "batch_size":       BATCH_SIZE,
+            "pos_weight":       POS_WEIGHT,
             "loss":             "BCEWithLogitsLoss(pos_weight)",
             "feature_eng":      "ChargesPerMonth,HighSpender,NewCustomer,LongTermCustomer",
-            "optimize_metric":  "recall_churn",
-            "min_precision":    0.30,
+            "threshold_policy": "min_expected_cost",
+            "cost_fn":          COST_FN,
+            "cost_fp":          COST_FP,
             "production_model": True,
             "seed":             SEED,
         })
         mlflow.log_metrics({
-            "recall_churn": mlp_rec,
-            "auc_roc":      mlp_auc,
-            "pr_auc":       mlp_pr_auc,
-            "f1_score":     mlp_f1,
-            "accuracy":     mlp_acc,
+            "auc_roc":       metrics["auc"],
+            "pr_auc":        metrics["pr_auc"],
+            "recall_churn":  metrics["recall"],
+            "f1_score":      metrics["f1"],
+            "accuracy":      metrics["accuracy"],
+            "threshold":     metrics["threshold"],
+            "fn_count":      metrics["fn"],
+            "fp_count":      metrics["fp"],
+            "expected_cost": metrics["expected_cost"],
         })
         mlflow.pytorch.log_model(model, artifact_path="mlp_model")

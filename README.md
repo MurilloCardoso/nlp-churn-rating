@@ -52,3 +52,4 @@ uvicorn src.api:app --reload
 
 
 
+ mlflow ui --backend-store-uri ./mlruns
