@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from src.config import MODELS_DIR
@@ -135,6 +135,11 @@ def _preprocess(customer: CustomerFeatures) -> np.ndarray:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
 
 @app.get("/health", summary="Verifica disponibilidade da API")
 def health() -> dict:

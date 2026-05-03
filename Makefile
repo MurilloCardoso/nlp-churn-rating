@@ -1,4 +1,4 @@
-.PHONY: install lint test train run
+.PHONY: install lint test train run mlflow
 
 install:
 	uv sync --extra dev
@@ -17,3 +17,6 @@ train:
 
 run:
 	uv run uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
+
+mlflow:
+	uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --port 5000
