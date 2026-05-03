@@ -174,7 +174,8 @@ make format   # ruff format
 Subir a UI (padrão em `./mlruns`):
 
 ```bash
-uv run mlflow ui --backend-store-uri ./mlruns
+make mlflow
+# equivalente a: uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlruns --port 5000
 # http://127.0.0.1:5000
 ```
 
@@ -228,15 +229,5 @@ Cada run do `make train` registra:
 
 - [docs/MODEL_CARD.md](docs/MODEL_CARD.md) — Model Card completo: uso pretendido, métricas, vieses, cenários de falha, plano de monitoramento.
 
-## Roadmap
-
-- [x] Model Card em `docs/`
-- [ ] Notebook de sensibilidade de custo (variar FN/FP e ver threshold)
-- [ ] Vídeo STAR (5 min)
-- [ ] Deploy opcional em nuvem
-
 ---
 
-## Licença
-
-Projeto acadêmico — Pos-Tech Fase 1.
