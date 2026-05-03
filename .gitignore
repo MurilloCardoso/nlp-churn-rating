@@ -9,5 +9,5 @@ wheels/
 # Virtual environments
 .venv
 mlruns
-DEV.mdmlflow.db
+mlflow.db
 mlruns/
