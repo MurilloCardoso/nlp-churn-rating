@@ -224,9 +224,13 @@ Cada run do `make train` registra:
 
 ---
 
+## Documentação adicional
+
+- [docs/MODEL_CARD.md](docs/MODEL_CARD.md) — Model Card completo: uso pretendido, métricas, vieses, cenários de falha, plano de monitoramento.
+
 ## Roadmap
 
-- [ ] Model Card em `docs/` (limitações, vieses, cenários de falha)
+- [x] Model Card em `docs/`
 - [ ] Notebook de sensibilidade de custo (variar FN/FP e ver threshold)
 - [ ] Vídeo STAR (5 min)
 - [ ] Deploy opcional em nuvem

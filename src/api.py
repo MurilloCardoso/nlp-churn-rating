@@ -12,11 +12,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.main import BASE_DIR, ChurnMLP
+from src.config import MODELS_DIR
+from src.models import ChurnMLP
 
 logger = logging.getLogger(__name__)
-
-MODELS_DIR = BASE_DIR / "models"
 
 # Artefatos carregados no startup
 _state: dict = {}

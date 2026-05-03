@@ -10,7 +10,7 @@ import torch
 from fastapi.testclient import TestClient
 from sklearn.preprocessing import StandardScaler
 
-from src.main import ChurnMLP
+from src.models import ChurnMLP
 
 # ── Fixtures de artefatos mockados ────────────────────────────────────────────
 

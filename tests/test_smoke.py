@@ -2,7 +2,8 @@
 
 import torch
 
-from src.main import ChurnMLP
+from src.models import ChurnMLP
+
 
 def test_backward_pass():
     model = ChurnMLP(input_dim=10)

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.main import best_threshold_recall
+from src.metrics import best_threshold_recall
 
 
 def _make_perfect_probs(n=100):

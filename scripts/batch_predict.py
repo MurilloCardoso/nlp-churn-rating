@@ -33,7 +33,7 @@ def main(n: int, seed: int) -> None:
     y_true = sample["Churn"].map({"Yes": 1, "No": 0}).values
 
     preds, probs = [], []
-    for i, row in sample.iterrows():
+    for _, row in sample.iterrows():
         payload = {k: row[k] for k in FEATURES}
         payload["SeniorCitizen"] = int(payload["SeniorCitizen"])
         payload["tenure"]        = int(payload["tenure"])
